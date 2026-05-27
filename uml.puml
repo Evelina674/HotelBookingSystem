@@ -1,52 +1,151 @@
 @startuml
+title Hotel Booking System - UML Class Diagram
 
 class Client {
     +Id : Guid
     +FullName : string
     +Phone : string
+    +Client()
+    +Client(fullName : string, phone : string)
+    +ToString() : string
 }
 
 class Room {
     +Number : int
     +PricePerNight : decimal
     +IsBooked : bool
+    +Room()
+    +Room(number : int, pricePerNight : decimal)
+    +ToString() : string
+    +Equals(obj : object) : bool
+    +GetHashCode() : int
 }
 
 class Booking {
     +Id : Guid
+    +Client : Client
+    +Room : Room
     +CheckInDate : DateTime
     +CheckOutDate : DateTime
-    +TotalDays()
-    +TotalPrice()
+    +Booking()
+    +Booking(client : Client, room : Room, checkIn : DateTime, checkOut : DateTime)
+    +TotalDays() : int
+    +TotalPrice() : decimal
 }
 
 abstract class HotelService {
     +Name : string
     +Price : decimal
-    +GetInfo()
+    #HotelService(name : string, price : decimal)
+    +GetInfo() : string
 }
 
-class BreakfastService
-class ParkingService
+class BreakfastService {
+    +BreakfastService()
+    +GetInfo() : string
+}
+
+class ParkingService {
+    +ParkingService()
+    +GetInfo() : string
+}
 
 interface IPriceCalculator {
-    +CalculatePrice()
+    +CalculatePrice() : decimal
 }
 
-class BasicRoom
+class BasicRoom {
+    +Price : decimal
+    +BasicRoom(price : decimal)
+    +CalculatePrice() : decimal
+}
 
-class Invoice
-class InvoiceBuilder
-class Repository~T~
+abstract class RoomDecorator {
+    #Room : IPriceCalculator
+    #RoomDecorator(room : IPriceCalculator)
+    +CalculatePrice() : decimal
+}
 
-Booking --> Client
-Booking --> Room
+class BreakfastDecorator {
+    +BreakfastDecorator(room : IPriceCalculator)
+    +CalculatePrice() : decimal
+}
+
+class ParkingDecorator {
+    +ParkingDecorator(room : IPriceCalculator)
+    +CalculatePrice() : decimal
+}
+
+class Invoice {
+    +ClientName : string
+    +RoomNumber : int
+    +RoomPrice : decimal
+    +ServicesPrice : decimal
+    +TotalPrice : decimal
+    +ToString() : string
+}
+
+class InvoiceBuilder {
+    -_invoice : Invoice
+    +SetClient(clientName : string) : InvoiceBuilder
+    +SetRoom(roomNumber : int, roomPrice : decimal) : InvoiceBuilder
+    +SetServices(servicesPrice : decimal) : InvoiceBuilder
+    +Build() : Invoice
+}
+
+class Repository<T> {
+    -_items : List<T>
+    +Add(item : T) : void
+    +GetAll() : List<T>
+    +Count() : int
+}
+
+class ServiceFactory {
+    +CreateService(serviceType : string) : HotelService
+}
+
+class BookingException {
+    +BookingException(message : string)
+}
+
+class JsonStorageService<T> {
+    +Save(filePath : string, data : T) : void
+    +Load(filePath : string) : T
+}
+
+class RetryPolicyService {
+    +Execute(action : Action, retryCount : int) : void
+}
+
+class RoomExtensions {
+    +GetExpensiveRooms(rooms : IEnumerable<Room>, minPrice : decimal) : IEnumerable<Room>
+}
+
+interface ILoggerService {
+    +Log(message : string) : void
+}
+
+Client "1" <-- "1" Booking
+Room "1" <-- "1" Booking
 
 HotelService <|-- BreakfastService
 HotelService <|-- ParkingService
 
 IPriceCalculator <|.. BasicRoom
+IPriceCalculator <|.. RoomDecorator
+RoomDecorator <|-- BreakfastDecorator
+RoomDecorator <|-- ParkingDecorator
+
+RoomDecorator o-- IPriceCalculator
 
 InvoiceBuilder --> Invoice
+ServiceFactory --> HotelService
+BookingException --|> Exception
+
+Repository<T> o-- T
+JsonStorageService<T> ..> T
+RoomExtensions ..> Room
+RetryPolicyService ..> BookingException
+ILoggerService ..> LoggerServiceTests
 
 @enduml
