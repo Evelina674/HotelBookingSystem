@@ -1,0 +1,52 @@
+@startuml
+
+class Client {
+    +Id : Guid
+    +FullName : string
+    +Phone : string
+}
+
+class Room {
+    +Number : int
+    +PricePerNight : decimal
+    +IsBooked : bool
+}
+
+class Booking {
+    +Id : Guid
+    +CheckInDate : DateTime
+    +CheckOutDate : DateTime
+    +TotalDays()
+    +TotalPrice()
+}
+
+abstract class HotelService {
+    +Name : string
+    +Price : decimal
+    +GetInfo()
+}
+
+class BreakfastService
+class ParkingService
+
+interface IPriceCalculator {
+    +CalculatePrice()
+}
+
+class BasicRoom
+
+class Invoice
+class InvoiceBuilder
+class Repository~T~
+
+Booking --> Client
+Booking --> Room
+
+HotelService <|-- BreakfastService
+HotelService <|-- ParkingService
+
+IPriceCalculator <|.. BasicRoom
+
+InvoiceBuilder --> Invoice
+
+@enduml
