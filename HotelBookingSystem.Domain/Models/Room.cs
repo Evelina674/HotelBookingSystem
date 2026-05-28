@@ -8,26 +8,29 @@ public class Room
 
     public decimal PricePerNight { get; set; }
 
+    public int Rating { get; set; }
+
     public bool IsBooked { get; set; }
 
     public Room()
     {
     }
 
-    public Room(int number, string name, decimal pricePerNight)
+    public Room(int number, string name, decimal pricePerNight, int rating = 5)
     {
         Number = number;
         Name = name;
         PricePerNight = pricePerNight;
+        Rating = rating;
         IsBooked = false;
     }
 
-    // Copy constructor
     public Room(Room otherRoom)
     {
         Number = otherRoom.Number;
         Name = otherRoom.Name;
         PricePerNight = otherRoom.PricePerNight;
+        Rating = otherRoom.Rating;
         IsBooked = otherRoom.IsBooked;
     }
 
@@ -58,7 +61,7 @@ public class Room
 
     public override string ToString()
     {
-        return $"{Number} - {Name} - {PricePerNight:C}";
+        return $"{Number} - {Name} - {PricePerNight:C} - Рейтинг: {new string('★', Rating)}";
     }
 
     public override bool Equals(object? obj)

@@ -1,34 +1,41 @@
-﻿using HotelBookingSystem.Domain.Decorators;
+﻿using System.Text;
+using HotelBookingSystem.Domain.Decorators;
 using HotelBookingSystem.Domain.Interfaces;
 using HotelBookingSystem.Domain.Models;
 using HotelBookingSystem.Domain.Services;
 
 var rooms = new List<Room>
 {
-    new Room(101, "Standard Room", 120),
-    new Room(102, "Family Room", 150),
-    new Room(201, "Deluxe Room", 220),
-    new Room(301, "Suite", 350),
-    new Room(401, "Presidential Suite", 500)
+    new Room(101, "Стандартний номер", 120, 3),
+    new Room(102, "Сімейний номер", 150, 4),
+    new Room(201, "Номер Deluxe", 220, 4),
+    new Room(301, "Люкс", 350, 5),
+    new Room(401, "Президентський люкс", 500, 5)
 };
+
+var bookings = new List<Booking>();
+var invoiceStorage = new JsonStorageService<List<Invoice>>();
 
 while (true)
 {
     Console.WriteLine();
-    Console.WriteLine("HOTEL BOOKING SYSTEM");
-    Console.WriteLine("====================");
-    Console.WriteLine("1 - Create booking");
-    Console.WriteLine("2 - Show available rooms");
-    Console.WriteLine("3 - Show room statistics");
-    Console.WriteLine("4 - Exit");
+    Console.WriteLine("СИСТЕМА БРОНЮВАННЯ ГОТЕЛЮ");
+    Console.WriteLine("==========================");
+    Console.WriteLine("1 - Створити бронювання");
+    Console.WriteLine("2 - Переглянути доступні номери");
+    Console.WriteLine("3 - Переглянути статистику готелю");
+    Console.WriteLine("4 - Скасувати бронювання");
+    Console.WriteLine("5 - Пошук номера");
+    Console.WriteLine("6 - Переглянути історію бронювань");
+    Console.WriteLine("7 - Вихід");
     Console.WriteLine();
 
-    Console.Write("Choose option: ");
+    Console.Write("Оберіть пункт меню: ");
     string? option = Console.ReadLine();
 
     if (option == "1")
     {
-        CreateBooking(rooms);
+        CreateBooking(rooms, bookings, invoiceStorage);
     }
     else if (option == "2")
     {
@@ -36,76 +43,86 @@ while (true)
     }
     else if (option == "3")
     {
-        ShowStatistics(rooms);
+        ShowStatistics(rooms, bookings);
     }
     else if (option == "4")
     {
-        Console.WriteLine("Program finished.");
+        CancelBooking(rooms, bookings, invoiceStorage);
+    }
+    else if (option == "5")
+    {
+        SearchRoom(rooms);
+    }
+    else if (option == "6")
+    {
+        ShowBookingHistory(bookings);
+    }
+    else if (option == "7")
+    {
+        Console.WriteLine("Програму завершено.");
         break;
     }
     else
     {
-        Console.WriteLine("Invalid option. Try again.");
+        Console.WriteLine("Невірний вибір. Спробуйте ще раз.");
     }
 }
 
-static void CreateBooking(List<Room> rooms)
+static void CreateBooking(
+    List<Room> rooms,
+    List<Booking> bookings,
+    JsonStorageService<List<Invoice>> invoiceStorage)
 {
     Console.WriteLine();
-    Console.WriteLine("CREATE BOOKING");
-    Console.WriteLine("--------------");
+    Console.WriteLine("СТВОРЕННЯ БРОНЮВАННЯ");
+    Console.WriteLine("--------------------");
 
-    Console.Write("Enter client name: ");
+    Console.Write("Введіть ПІБ клієнта: ");
     string clientName = Console.ReadLine()!;
 
-    Console.Write("Enter client phone: ");
+    Console.Write("Введіть номер телефону: ");
     string clientPhone = Console.ReadLine()!;
 
     var client = new Client(clientName, clientPhone);
 
-    Console.WriteLine();
     ShowRooms(rooms);
 
-    int selectedRoomNumber = ReadInt("Choose room number: ");
+    int selectedRoomNumber = ReadInt("Оберіть номер кімнати: ");
 
     var room = rooms.FirstOrDefault(r => r.Number == selectedRoomNumber);
 
     if (room is null)
     {
-        Console.WriteLine("Room not found.");
+        Console.WriteLine("Номер не знайдено.");
         return;
     }
 
     if (room.IsBooked)
     {
-        Console.WriteLine("This room is already booked.");
+        Console.WriteLine("Цей номер вже заброньований.");
         return;
     }
 
-    DateTime checkInDate = ReadDate("Enter check-in date (yyyy-mm-dd): ");
-    DateTime checkOutDate = ReadDate("Enter check-out date (yyyy-mm-dd): ");
+    DateTime checkInDate = ReadDate("Введіть дату заїзду (рррр-мм-дд): ");
+    DateTime checkOutDate = ReadDate("Введіть дату виїзду (рррр-мм-дд): ");
 
     if (checkOutDate <= checkInDate)
     {
-        Console.WriteLine("Check-out date must be later than check-in date.");
+        Console.WriteLine("Дата виїзду повинна бути пізніше дати заїзду.");
         return;
     }
 
-    var booking = new Booking(
-        client,
-        room,
-        checkInDate,
-        checkOutDate);
+    var booking = new Booking(client, room, checkInDate, checkOutDate);
 
     IPriceCalculator roomPriceCalculator = new BasicRoom(room.PricePerNight);
 
-    bool hasBreakfast = ReadYesNo("Add breakfast? (y/n): ");
+    bool hasBreakfast = ReadYesNo("Додати сніданок? (т/н): ");
     if (hasBreakfast)
     {
         roomPriceCalculator = new BreakfastDecorator(roomPriceCalculator);
     }
 
-    bool hasParking = ReadYesNo("Add parking? (y/n): ");
+    bool hasParking = ReadYesNo("Додати паркування? (т/н): ");
     if (hasParking)
     {
         roomPriceCalculator = new ParkingDecorator(roomPriceCalculator);
@@ -113,119 +130,265 @@ static void CreateBooking(List<Room> rooms)
 
     decimal pricePerNightWithServices = roomPriceCalculator.CalculatePrice();
     int totalDays = booking.TotalDays();
-    decimal totalPrice = pricePerNightWithServices * totalDays;
+    decimal totalBeforeDiscount = pricePerNightWithServices * totalDays;
+
+    decimal discountPercent = CalculateDiscountPercent(totalDays);
+    decimal discountAmount = totalBeforeDiscount * discountPercent / 100;
+    decimal totalPrice = totalBeforeDiscount - discountAmount;
 
     room.IsBooked = true;
+    bookings.Add(booking);
 
-    var invoice = new Invoice
-    {
-        ClientName = client.FullName,
-        RoomNumber = room.Number,
-        RoomPrice = room.PricePerNight * totalDays,
-        ServicesPrice = totalPrice - room.PricePerNight * totalDays,
-        TotalPrice = totalPrice
-    };
+    SaveInvoices(bookings, invoiceStorage);
 
-    var storage = new JsonStorageService<Invoice>();
-    storage.Save("booking-invoice.json", invoice);
+    string invoiceText = BuildInvoiceText(
+        client,
+        room,
+        booking,
+        hasBreakfast,
+        hasParking,
+        pricePerNightWithServices,
+        totalBeforeDiscount,
+        discountPercent,
+        discountAmount,
+        totalPrice);
 
-    PrintInvoice(client, room, booking, hasBreakfast, hasParking, pricePerNightWithServices, totalPrice);
+    Console.WriteLine(invoiceText);
+
+    ExportInvoiceToTxt(invoiceText);
 
     Console.WriteLine();
-    Console.WriteLine("Invoice saved to booking-invoice.json");
+    Console.WriteLine("Бронювання успішно збережено у файл bookings.json");
+    Console.WriteLine("Рахунок експортовано у файл invoice.txt");
+}
+
+static decimal CalculateDiscountPercent(int totalDays)
+{
+    if (totalDays >= 14)
+    {
+        return 15;
+    }
+
+    if (totalDays >= 7)
+    {
+        return 10;
+    }
+
+    return 0;
+}
+
+static void CancelBooking(
+    List<Room> rooms,
+    List<Booking> bookings,
+    JsonStorageService<List<Invoice>> invoiceStorage)
+{
+    Console.WriteLine();
+    Console.WriteLine("СКАСУВАННЯ БРОНЮВАННЯ");
+    Console.WriteLine("---------------------");
+
+    int roomNumber = ReadInt("Введіть номер кімнати для скасування: ");
+
+    var room = rooms.FirstOrDefault(r => r.Number == roomNumber);
+
+    if (room is null)
+    {
+        Console.WriteLine("Номер не знайдено.");
+        return;
+    }
+
+    if (!room.IsBooked)
+    {
+        Console.WriteLine("Цей номер не заброньований.");
+        return;
+    }
+
+    var booking = bookings.FirstOrDefault(b => b.Room?.Number == roomNumber);
+
+    if (booking is not null)
+    {
+        bookings.Remove(booking);
+    }
+
+    room.IsBooked = false;
+
+    SaveInvoices(bookings, invoiceStorage);
+
+    Console.WriteLine("Бронювання успішно скасовано.");
+}
+
+static void SearchRoom(List<Room> rooms)
+{
+    Console.WriteLine();
+    Console.WriteLine("ПОШУК НОМЕРА");
+    Console.WriteLine("------------");
+
+    Console.Write("Введіть назву номера або її частину: ");
+    string searchText = Console.ReadLine()!;
+
+    var foundRooms = rooms
+        .Where(r => r.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+
+    if (!foundRooms.Any())
+    {
+        Console.WriteLine("Номерів не знайдено.");
+        return;
+    }
+
+    foreach (var room in foundRooms)
+    {
+        string status = room.IsBooked ? "Заброньований" : "Вільний";
+        Console.WriteLine($"{room} - {status}");
+    }
 }
 
 static void ShowRooms(List<Room> rooms)
 {
     Console.WriteLine();
-    Console.WriteLine("AVAILABLE ROOMS");
+    Console.WriteLine("ДОСТУПНІ НОМЕРИ");
     Console.WriteLine("---------------");
 
-    foreach (var room in rooms)
+    var availableRooms = rooms.Where(r => !r.IsBooked).ToList();
+
+    if (!availableRooms.Any())
     {
-        string status = room.IsBooked ? "Booked" : "Available";
-        Console.WriteLine($"{room.Number} - {room.Name} - {room.PricePerNight:C} - {status}");
+        Console.WriteLine("Наразі немає доступних номерів.");
+        return;
+    }
+
+    foreach (var room in availableRooms)
+    {
+        Console.WriteLine(room);
     }
 }
 
-static void ShowStatistics(List<Room> rooms)
+static void ShowStatistics(List<Room> rooms, List<Booking> bookings)
 {
     Console.WriteLine();
-    Console.WriteLine("ROOM STATISTICS");
-    Console.WriteLine("---------------");
+    Console.WriteLine("СТАТИСТИКА ГОТЕЛЮ");
+    Console.WriteLine("-----------------");
 
-    var totalRooms = rooms.Count;
-    var averagePrice = rooms.Average(r => r.PricePerNight);
-    var mostExpensiveRoom = rooms.OrderByDescending(r => r.PricePerNight).First();
-    var cheapestRoom = rooms.OrderBy(r => r.PricePerNight).First();
-    var availableRooms = rooms.Count(r => !r.IsBooked);
-    var bookedRooms = rooms.Count(r => r.IsBooked);
+    decimal totalRevenue = bookings.Sum(b => b.TotalPrice());
 
-    Console.WriteLine($"Total rooms: {totalRooms}");
-    Console.WriteLine($"Available rooms: {availableRooms}");
-    Console.WriteLine($"Booked rooms: {bookedRooms}");
-    Console.WriteLine($"Average price: {averagePrice:C}");
-    Console.WriteLine($"Cheapest room: {cheapestRoom}");
-    Console.WriteLine($"Most expensive room: {mostExpensiveRoom}");
+    Console.WriteLine($"Всього номерів: {rooms.Count}");
+    Console.WriteLine($"Вільних номерів: {rooms.Count(r => !r.IsBooked)}");
+    Console.WriteLine($"Заброньованих номерів: {rooms.Count(r => r.IsBooked)}");
+    Console.WriteLine($"Середня ціна номера: {rooms.Average(r => r.PricePerNight):C}");
+    Console.WriteLine($"Найдешевший номер: {rooms.OrderBy(r => r.PricePerNight).First()}");
+    Console.WriteLine($"Найдорожчий номер: {rooms.OrderByDescending(r => r.PricePerNight).First()}");
+    Console.WriteLine($"Всього бронювань: {bookings.Count}");
+    Console.WriteLine($"Загальний дохід без урахування знижок: {totalRevenue:C}");
 }
 
-static void PrintInvoice(
+static void ShowBookingHistory(List<Booking> bookings)
+{
+    Console.WriteLine();
+    Console.WriteLine("ІСТОРІЯ БРОНЮВАНЬ");
+    Console.WriteLine("-----------------");
+
+    if (!bookings.Any())
+    {
+        Console.WriteLine("Історія бронювань порожня.");
+        return;
+    }
+
+    foreach (var booking in bookings)
+    {
+        Console.WriteLine(
+            $"{booking.Client?.FullName} | " +
+            $"Номер: {booking.Room?.Number} - {booking.Room?.Name} | " +
+            $"Заїзд: {booking.CheckInDate:yyyy-MM-dd} | " +
+            $"Виїзд: {booking.CheckOutDate:yyyy-MM-dd} | " +
+            $"Днів: {booking.TotalDays()} | " +
+            $"Сума без знижки: {booking.TotalPrice():C}");
+    }
+}
+
+static void SaveInvoices(
+    List<Booking> bookings,
+    JsonStorageService<List<Invoice>> invoiceStorage)
+{
+    var invoices = bookings.Select(booking => new Invoice
+    {
+        ClientName = booking.Client?.FullName ?? string.Empty,
+        RoomNumber = booking.Room?.Number ?? 0,
+        RoomPrice = booking.Room?.PricePerNight * booking.TotalDays() ?? 0,
+        ServicesPrice = 0,
+        TotalPrice = booking.TotalPrice()
+    }).ToList();
+
+    invoiceStorage.Save("bookings.json", invoices);
+}
+
+static string BuildInvoiceText(
     Client client,
     Room room,
     Booking booking,
     bool hasBreakfast,
     bool hasParking,
     decimal pricePerNightWithServices,
+    decimal totalBeforeDiscount,
+    decimal discountPercent,
+    decimal discountAmount,
     decimal totalPrice)
 {
-    Console.WriteLine();
-    Console.WriteLine("==============================");
-    Console.WriteLine("         HOTEL INVOICE");
-    Console.WriteLine("==============================");
-    Console.WriteLine($"Client: {client.FullName}");
-    Console.WriteLine($"Phone: {client.Phone}");
-    Console.WriteLine($"Room: {room.Number} - {room.Name}");
-    Console.WriteLine($"Check-in: {booking.CheckInDate:yyyy-MM-dd}");
-    Console.WriteLine($"Check-out: {booking.CheckOutDate:yyyy-MM-dd}");
-    Console.WriteLine($"Days: {booking.TotalDays()}");
-    Console.WriteLine($"Breakfast: {(hasBreakfast ? "Yes" : "No")}");
-    Console.WriteLine($"Parking: {(hasParking ? "Yes" : "No")}");
-    Console.WriteLine($"Price per night with services: {pricePerNightWithServices:C}");
-    Console.WriteLine($"Total price: {totalPrice:C}");
-    Console.WriteLine("==============================");
+    var builder = new StringBuilder();
+
+    builder.AppendLine();
+    builder.AppendLine("==============================");
+    builder.AppendLine("        РАХУНОК ГОТЕЛЮ");
+    builder.AppendLine("==============================");
+    builder.AppendLine($"Клієнт: {client.FullName}");
+    builder.AppendLine($"Телефон: {client.Phone}");
+    builder.AppendLine($"Номер: {room.Number} - {room.Name}");
+    builder.AppendLine($"Рейтинг номера: {new string('★', room.Rating)}");
+    builder.AppendLine($"Дата заїзду: {booking.CheckInDate:yyyy-MM-dd}");
+    builder.AppendLine($"Дата виїзду: {booking.CheckOutDate:yyyy-MM-dd}");
+    builder.AppendLine($"Кількість днів: {booking.TotalDays()}");
+    builder.AppendLine($"Сніданок: {(hasBreakfast ? "Так" : "Ні")}");
+    builder.AppendLine($"Паркування: {(hasParking ? "Так" : "Ні")}");
+    builder.AppendLine($"Ціна за добу з послугами: {pricePerNightWithServices:C}");
+    builder.AppendLine($"Сума без знижки: {totalBeforeDiscount:C}");
+    builder.AppendLine($"Знижка: {discountPercent}%");
+    builder.AppendLine($"Сума знижки: {discountAmount:C}");
+    builder.AppendLine($"Загальна вартість: {totalPrice:C}");
+    builder.AppendLine("==============================");
+
+    return builder.ToString();
+}
+
+static void ExportInvoiceToTxt(string invoiceText)
+{
+    File.WriteAllText("invoice.txt", invoiceText);
 }
 
 static int ReadInt(string message)
 {
-    int value;
-
     while (true)
     {
         Console.Write(message);
 
-        if (int.TryParse(Console.ReadLine(), out value))
+        if (int.TryParse(Console.ReadLine(), out int value))
         {
             return value;
         }
 
-        Console.WriteLine("Invalid number. Try again.");
+        Console.WriteLine("Некоректне число. Спробуйте ще раз.");
     }
 }
 
 static DateTime ReadDate(string message)
 {
-    DateTime date;
-
     while (true)
     {
         Console.Write(message);
 
-        if (DateTime.TryParse(Console.ReadLine(), out date))
+        if (DateTime.TryParse(Console.ReadLine(), out DateTime date))
         {
             return date;
         }
 
-        Console.WriteLine("Invalid date. Use format yyyy-mm-dd.");
+        Console.WriteLine("Некоректна дата. Використовуйте формат рррр-мм-дд.");
     }
 }
 
@@ -234,18 +397,18 @@ static bool ReadYesNo(string message)
     while (true)
     {
         Console.Write(message);
-        string? answer = Console.ReadLine();
+        string? answer = Console.ReadLine()?.ToLower();
 
-        if (answer?.ToLower() == "y")
+        if (answer == "т" || answer == "так")
         {
             return true;
         }
 
-        if (answer?.ToLower() == "n")
+        if (answer == "н" || answer == "ні")
         {
             return false;
         }
 
-        Console.WriteLine("Please enter y or n.");
+        Console.WriteLine("Введіть 'т' або 'н'.");
     }
 }
