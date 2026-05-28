@@ -7,6 +7,9 @@ using HotelBookingSystem.Domain.Repositories;
 using HotelBookingSystem.Domain.Services;
 using HotelBookingSystem.Domain.Extensions;
 using HotelBookingSystem.Domain.Exceptions;
+using HotelBookingSystem.Domain.Events;
+using HotelBookingSystem.Domain.DTOs;
+using HotelBookingSystem.Domain.Composite;
 
 Console.WriteLine("HOTEL BOOKING SYSTEM");
 Console.WriteLine("====================");
@@ -205,3 +208,49 @@ var copiedRoom = new Room(firstRoom);
 Console.WriteLine($"First + Second room price: {(firstRoom + secondRoom):C}");
 Console.WriteLine($"First room == Copied room: {firstRoom == copiedRoom}");
 Console.WriteLine($"First room != Second room: {firstRoom != secondRoom}");
+
+Console.WriteLine();
+Console.WriteLine("EVENTHANDLER / OBSERVER");
+Console.WriteLine("----------------");
+
+var notificationService = new BookingNotificationService();
+
+notificationService.BookingCreated += (sender, eventArgs) =>
+{
+    Console.WriteLine($"New booking created for client: {eventArgs.Booking.Client?.FullName}");
+};
+
+notificationService.CreateBooking(booking);
+
+notificationService.BookingCreated -= (sender, eventArgs) =>
+{
+    Console.WriteLine($"New booking created for client: {eventArgs.Booking.Client?.FullName}");
+};
+
+Console.WriteLine();
+Console.WriteLine("DTO + MAPPING");
+Console.WriteLine("----------------");
+
+var invoiceDto = InvoiceMapper.ToDto(invoice);
+
+Console.WriteLine($"DTO client: {invoiceDto.ClientName}");
+Console.WriteLine($"DTO room: {invoiceDto.RoomNumber}");
+Console.WriteLine($"DTO total: {invoiceDto.TotalPrice:C}");
+
+Console.WriteLine();
+Console.WriteLine("COLLECTION BENCHMARK");
+Console.WriteLine("----------------");
+
+var benchmarkService = new CollectionBenchmarkService();
+benchmarkService.CompareCollections();
+
+Console.WriteLine();
+Console.WriteLine("COMPOSITE PATTERN");
+Console.WriteLine("----------------");
+
+var firstFloor = new HotelFloor("First Floor");
+
+firstFloor.Add(new RoomComponent(new Room(101, 120)));
+firstFloor.Add(new RoomComponent(new Room(102, 150)));
+
+Console.WriteLine(firstFloor.GetDetails());
