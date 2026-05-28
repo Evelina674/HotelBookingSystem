@@ -60,7 +60,7 @@ public class InvoiceBuilderTests
     {
         var repository = new Repository<Room>();
 
-        repository.Add(new Room(101, 100));
+        repository.Add(new Room(101, "Standard Room", 100));
 
         Assert.Equal(1, repository.Count());
     }
@@ -70,8 +70,8 @@ public class InvoiceBuilderTests
     {
         var repository = new Repository<Room>();
 
-        repository.Add(new Room(101, 100));
-        repository.Add(new Room(102, 200));
+        repository.Add(new Room(101, "Standard Room", 100));
+        repository.Add(new Room(102, "Family Room", 200));
 
         Assert.Equal(2, repository.GetAll().Count);
     }
@@ -81,7 +81,7 @@ public class InvoiceBuilderTests
     {
         var booking = new Booking(
             new Client("Ivan", "111"),
-            new Room(101, 100),
+            new Room(102, "Family Room", 200),
             new DateTime(2026, 5, 1),
             new DateTime(2026, 5, 5));
 
@@ -93,7 +93,7 @@ public class InvoiceBuilderTests
     {
         var booking = new Booking(
             new Client("Ivan", "111"),
-            new Room(101, 100),
+            new Room(101, "Standard Room", 100),
             new DateTime(2026, 5, 1),
             new DateTime(2026, 5, 4));
 

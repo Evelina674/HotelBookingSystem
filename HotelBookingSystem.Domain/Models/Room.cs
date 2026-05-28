@@ -4,6 +4,8 @@ public class Room
 {
     public int Number { get; set; }
 
+    public string Name { get; set; } = string.Empty;
+
     public decimal PricePerNight { get; set; }
 
     public bool IsBooked { get; set; }
@@ -12,9 +14,10 @@ public class Room
     {
     }
 
-    public Room(int number, decimal pricePerNight)
+    public Room(int number, string name, decimal pricePerNight)
     {
         Number = number;
+        Name = name;
         PricePerNight = pricePerNight;
         IsBooked = false;
     }
@@ -23,6 +26,7 @@ public class Room
     public Room(Room otherRoom)
     {
         Number = otherRoom.Number;
+        Name = otherRoom.Name;
         PricePerNight = otherRoom.PricePerNight;
         IsBooked = otherRoom.IsBooked;
     }
@@ -54,7 +58,7 @@ public class Room
 
     public override string ToString()
     {
-        return $"Room {Number} - {PricePerNight:C}";
+        return $"{Number} - {Name} - {PricePerNight:C}";
     }
 
     public override bool Equals(object? obj)

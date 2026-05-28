@@ -13,7 +13,7 @@ public class CollectionBenchmarkService
 
         for (int i = 1; i <= 10000; i++)
         {
-            var room = new Room(i, 100 + i);
+            var room = new Room(i, $"Room {i}", 100 + i);
 
             roomsList.Add(room);
             roomsDictionary.Add(room.Number, room);
@@ -36,7 +36,7 @@ public class CollectionBenchmarkService
 
         stopwatch.Restart();
 
-        var foundInHashSet = roomsHashSet.Contains(new Room(9999, 10099));
+        var foundInHashSet = roomsHashSet.Contains(new Room(9999, "Room 9999", 10099));
 
         stopwatch.Stop();
         Console.WriteLine($"HashSet search time: {stopwatch.ElapsedTicks} ticks");
